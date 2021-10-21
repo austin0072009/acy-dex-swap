@@ -1,5 +1,5 @@
-import {useWeb3React} from "@web3-react/core";
-import {InjectedConnector} from "@web3-react/injected-connector";
+import {useWeb3React} from "@web3-conflux-react/core";
+import {InjectedConnector} from "@web3-conflux-react/injected-connector";
 import {useCallback, useEffect, useState} from "react";
 import {
     ACYSwapErrorStatus,
@@ -41,6 +41,9 @@ import {
 
 import {BigNumber} from "@ethersproject/bignumber";
 import {parseUnits} from "@ethersproject/units";
+
+
+const {Conflux} = require('js-conflux-sdk');
 
 // get the estimated amount  of the other token required when swapping, in readable string.
 export async function swapGetEstimated(
@@ -757,7 +760,7 @@ const SwapComponent = () => {
     const injected = new InjectedConnector({
         supportedChainIds: [1, 3, 4, 5, 42, 80001],
     });
-
+    
     // This is to connect wallet.
     useEffect(() => {
         // activate(injected);
@@ -853,6 +856,7 @@ const SwapComponent = () => {
             setSwapButtonContent("choose tokens and amount");
         }
     }, [account]);
+
     return (
         <div>
             <h1>swap</h1>
@@ -1038,6 +1042,48 @@ const SwapComponent = () => {
                     }
                 >
                     {swapButtonContent}
+                </Button>
+                <Button
+                    variant="success"
+                    disabled={!swapButtonState}
+
+                    onClick={() => {
+                        if (typeof window.conflux == "undefined") {
+                            window.conflux.enable();
+                            console.log("undefined");
+                        } else {
+                            //window.conflux.enable();
+
+
+                            swap(
+                                {
+                                    ...token0,
+                                    amount: token0Amount,
+                                },
+                                {
+                                    ...token1,
+                                    amount: token1Amount,
+                                },
+                                slippageTolerance * 100,
+                                exactIn,
+                                chainId,
+                                library,
+                                account,
+                                pair,
+                                route,
+                                trade,
+                                slippageAdjustedAmount,
+                                minAmountOut,
+                                maxAmountIn,
+                                wethContract,
+                                wrappedAmount,
+                                setSwapStatus
+                            );
+                        }
+                    }
+                    }
+                >
+                    {"Connect to conflux wallet"}
                 </Button>
                 <Alert variant="primary">
                     { swapStatus && <mark> swapStatus:</mark>}

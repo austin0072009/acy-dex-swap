@@ -1,6 +1,7 @@
 import {useWeb3React} from "@web3-react/core";
 import {InjectedConnector} from "@web3-react/injected-connector";
 import {useCallback, useEffect, useState} from "react";
+
 import {
     ACYSwapErrorStatus,
     approve,
@@ -29,7 +30,7 @@ import {
 } from "@uniswap/sdk";
 import {BigNumber} from "@ethersproject/bignumber";
 import {parseUnits} from "@ethersproject/units";
-
+const { Conflux } = require('js-conflux-sdk');
 
 // get the estimated amount of the other token required when adding liquidity, in readable string.
 export async function getEstimated(
@@ -37,9 +38,11 @@ export async function getEstimated(
     inputToken1,
     allowedSlippage = INITIAL_ALLOWED_SLIPPAGE,
     exactIn = true,
-    chainId,
+
+     chainId,
     library,
     account,
+
     setToken0Amount,
     setToken1Amount,
     setNeedApproveToken0,
@@ -74,6 +77,8 @@ export async function getEstimated(
         console.log(FACTORY_ADDRESS);
 
         let router = getRouterContract(library, account);
+
+
         let slippage = allowedSlippage * 0.01;
         let {
             address: inToken0Address,
@@ -138,6 +143,7 @@ export async function getEstimated(
                 setButtonStatus(false);
                 return new ACYSwapErrorStatus("Equal tokens!");
             }
+
             // get pair using our own provider
             const pair = await Fetcher.fetchPairData(token0, token1, library)
                 .then((pair) => {
@@ -855,14 +861,30 @@ const LiquidityComponent = () => {
     const dependentFieldPlaceholder = "Estimated value";
     const slippageTolerancePlaceholder = "please input a number from 1.00 to 100.00";
 
-    const {account, chainId, library, activate} = useWeb3React();
-    const injected = new InjectedConnector({
-        supportedChainIds: [1, 3, 4, 5, 42, 80001],
-    });
+    // const {account, chainId, library, activate} = useWeb3React();
+    // const injected = new InjectedConnector({
+    //     supportedChainIds: [1, 3, 4, 5, 42, 80001],
+    // });
 
-
-    useEffect(() => {
-        // activate(injected);
+    const [account ,setAccount] = useState();
+    const [library,setLibrary] = useState();
+    const [chainId,setChainId] = useState();
+    
+    useEffect(async () => {
+        const conflux = new Conflux();
+        const confluxPortal = window.conflux;
+      
+        conflux.provider = confluxPortal;
+      
+        confluxPortal.enable();
+      
+        const accounts = await confluxPortal.send('cfx_requestAccounts');
+        console.log('accounts');
+        console.log(accounts);
+        setAccount(accounts[0]);
+        setChainId(1);
+        setLibrary(window.conflux);
+        console.log(accounts[0]);
     }, []);
 
     let t0Changed = useCallback(async () => {
@@ -946,7 +968,7 @@ const LiquidityComponent = () => {
     }, [token0, token1, token0Amount, token1Amount, slippageTolerance,exactIn, chainId, library, account]);
 
 
-    useEffect(() => {
+    useEffect(async () => {
         if (account == undefined) {
             setButtonStatus(true);
             setButtonContent("Connect to Wallet");
@@ -956,7 +978,7 @@ const LiquidityComponent = () => {
         }
     }, [chainId, library, account]);
 
-    useEffect(() => {
+    useEffect(async () => {
         async function getAllUserLiquidityPositions() {
             if (account != undefined) {
                 setUserLiquidityPositions(
@@ -990,6 +1012,7 @@ const LiquidityComponent = () => {
                                     key={index}
                                     onClick={async () => {
                                         if (account == undefined) {
+                                            console.log(account);
                                             alert("please connect to your account");
                                         } else {
                                             setToken0(token);
@@ -1223,10 +1246,17 @@ const LiquidityComponent = () => {
                     disabled={!buttonStatus}
                     onClick={async () => {
                         if (account == undefined) {
-                            activate(injected);
+                            //activate(injected);
+                            // window.conflux.enable();
+                            // const accounts = window.conflux.send({ method: 'cfx_accounts' });
+                            // const account = accounts[0];
+
+                            console.log("undefined");
+                            console.log(account);
                             setButtonContent("choose tokens and amount");
                             setButtonStatus(false);
                         } else {
+                            console.log(account);
                             await addLiquidity(
                                 {
                                     ...token0,
