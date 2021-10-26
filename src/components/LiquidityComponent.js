@@ -1,6 +1,9 @@
 import {useWeb3React} from "@web3-react/core";
 import {InjectedConnector} from "@web3-react/injected-connector";
 import {useCallback, useEffect, useState} from "react";
+import { abi as IUniswapV2Router02ABI } from "../abis/IUniswapV2Router02.json";
+import { abi as IUniswapV2PairABI } from "@uniswap/v2-core/build/IUniswapV2Pair.json";
+import ERC20ABI from "../abis/ERC20.json";
 
 import {
     ACYSwapErrorStatus,
@@ -31,6 +34,9 @@ import {
 import {BigNumber} from "@ethersproject/bignumber";
 import {parseUnits} from "@ethersproject/units";
 const { Conflux } = require('js-conflux-sdk');
+const {TokenConflux} = require('./TokenConflux.class')
+
+
 
 // get the estimated amount of the other token required when adding liquidity, in readable string.
 export async function getEstimated(
@@ -38,7 +44,7 @@ export async function getEstimated(
     inputToken1,
     allowedSlippage = INITIAL_ALLOWED_SLIPPAGE,
     exactIn = true,
-
+     conflux,
      chainId,
     library,
     account,
@@ -76,8 +82,12 @@ export async function getEstimated(
 
         console.log(FACTORY_ADDRESS);
 
-        let router = getRouterContract(library, account);
-
+        //let router = getRouterContract(library, account);
+        let router = conflux.Contract({
+            abi:IUniswapV2Router02ABI,
+            address:FACTORY_ADDRESS
+        })
+        console.log("connect to conflux router contract")
 
         let slippage = allowedSlippage * 0.01;
         let {
@@ -133,10 +143,10 @@ export async function getEstimated(
             // use WETH for ETHER to work with Uniswap V2 SDK
             const token0 = token0IsETH
                 ? WETH[chainId]
-                : new Token(chainId, inToken0Address, inToken0Decimal, inToken0Symbol);
+                : new TokenConflux(chainId, inToken0Address, inToken0Decimal, inToken0Symbol);
             const token1 = token1IsETH
                 ? WETH[chainId]
-                : new Token(chainId, inToken1Address, inToken1Decimal, inToken1Symbol);
+                : new TokenConflux(chainId, inToken1Address, inToken1Decimal, inToken1Symbol);
 
             if (token0.equals(token1)) {
                 setButtonContent("Equal tokens");
@@ -312,21 +322,32 @@ export async function getEstimated(
 
             // check user account balance
             console.log("------------------ CHECK BALANCE ------------------");
-            let userToken0Balance = await getUserTokenBalanceRaw(
-                token0IsETH
-                    ? ETHER
-                    : new Token(chainId, inToken0Address, inToken0Decimal, inToken0Symbol),
-                account,
-                library
-            );
+            // let userToken0Balance = await getUserTokenBalanceRaw(
+            //     token0IsETH
+            //         ? ETHER
+            //         : new Token(chainId, inToken0Address, inToken0Decimal, inToken0Symbol),
+            //     account,
+            //     library
+            // );
 
-            let userToken1Balance = await getUserTokenBalanceRaw(
-                token1IsETH
-                    ? ETHER
-                    : new Token(chainId, inToken1Address, inToken1Decimal, inToken1Symbol),
-                account,
-                library
-            );
+            //get token router
+
+            const token0Contract = conflux.Contract({
+                abi: ERC20ABI,
+                address: token0.address,
+              });
+
+
+            let userToken0Balance = await token0Contract.balanceOf(account);
+
+            const token1Contract = conflux.Contract({
+                abi: ERC20ABI,
+                address: token1.address,
+              });
+
+
+            let userToken1Balance = await await token1Contract.balanceOf(account);
+    
 
             console.log("token0 balance");
             console.log(userToken0Balance);
@@ -337,8 +358,8 @@ export async function getEstimated(
             let userHasSufficientBalance;
             try {
                 userHasSufficientBalance =
-                    userToken0Balance.gte(parseUnits(inToken0Amount, inToken0Decimal)) &&
-                    userToken1Balance.gte(parseUnits(inToken1Amount, inToken1Decimal));
+                    userToken0Balance >= (parseUnits(inToken0Amount, inToken0Decimal)) &&
+                    userToken1Balance >= (parseUnits(inToken1Amount, inToken1Decimal));
             }catch(e){
                 console.log(userHasSufficientBalance);
                 console.log(e);
@@ -702,6 +723,7 @@ export async function addLiquidity(
     return;
 }
 
+// not use in conflux
 // expects at least has WETH as one of the tokens
 export async function getAllLiquidityPositions(tokens, chainId, library, account) {
     // we only want WETH
@@ -869,6 +891,7 @@ const LiquidityComponent = () => {
     const [account ,setAccount] = useState();
     const [library,setLibrary] = useState();
     const [chainId,setChainId] = useState();
+    const [conflux,setConflux] = useState();
     
     useEffect(async () => {
         const conflux = new Conflux();
@@ -884,6 +907,7 @@ const LiquidityComponent = () => {
         setAccount(accounts[0]);
         setChainId(1);
         setLibrary(window.conflux);
+        setConflux(conflux);
         console.log(accounts[0]);
     }, []);
 
@@ -901,6 +925,7 @@ const LiquidityComponent = () => {
             },
             slippageTolerance * 100,
             exactIn,
+            conflux,
             chainId,
             library,
             account,
@@ -938,6 +963,7 @@ const LiquidityComponent = () => {
             },
             slippageTolerance * 100,
             exactIn,
+            conflux,
             chainId,
             library,
             account,
@@ -960,6 +986,8 @@ const LiquidityComponent = () => {
             setArgs,
             setValue);
     }, [token0, token1, token0Amount, token1Amount, slippageTolerance, exactIn, chainId, library, account]);
+
+    
     useEffect(() => {
         t0Changed();
     }, [token0, token1, token0Amount, token1Amount, slippageTolerance,exactIn, chainId, library, account]);
@@ -967,7 +995,7 @@ const LiquidityComponent = () => {
         t1Changed();
     }, [token0, token1, token0Amount, token1Amount, slippageTolerance,exactIn, chainId, library, account]);
 
-
+//Detect account connect or not 
     useEffect(async () => {
         if (account == undefined) {
             setButtonStatus(true);
@@ -978,22 +1006,24 @@ const LiquidityComponent = () => {
         }
     }, [chainId, library, account]);
 
-    useEffect(async () => {
-        async function getAllUserLiquidityPositions() {
-            if (account != undefined) {
-                setUserLiquidityPositions(
-                    await getAllLiquidityPositions(
-                        supportedTokens,
-                        chainId,
-                        library,
-                        account
-                    )
-                );
-            }
-        }
+    
+    // not use in conflux
+    // useEffect(async () => {
+    //     async function getAllUserLiquidityPositions() {
+    //         if (account != undefined) {
+    //             setUserLiquidityPositions(
+    //                 await getAllLiquidityPositions(
+    //                     supportedTokens,
+    //                     chainId,
+    //                     library,
+    //                     account
+    //                 )
+    //             );
+    //         }
+    //     }
 
-        getAllUserLiquidityPositions();
-    }, [chainId, library, account]);
+    //     getAllUserLiquidityPositions();
+    // }, [chainId, library, account]);
 
 
     return (
@@ -1017,12 +1047,13 @@ const LiquidityComponent = () => {
                                         } else {
                                             setToken0(token);
                                             setToken0Balance(
-                                                await getUserTokenBalance(
-                                                    token,
-                                                    chainId,
-                                                    account,
-                                                    library
-                                                )
+                                                // await getUserTokenBalance(
+                                                //     token,
+                                                //     chainId,
+                                                //     account,
+                                                //     library
+                                                // )
+                                                1000
                                             );
                                             setToken0BalanceShow(true);
                                         }
@@ -1041,6 +1072,7 @@ const LiquidityComponent = () => {
                         onChange={(e) => {
                             setExactIn(true);
                             setToken0Amount(e.target.value);
+                            console.log("input amount " + e.target.value);
                         }}
                     />
                     {token0BalanceShow ?
@@ -1064,12 +1096,13 @@ const LiquidityComponent = () => {
                                         } else {
                                             setToken1(token);
                                             setToken1Balance(
-                                                await getUserTokenBalance(
-                                                    token,
-                                                    chainId,
-                                                    account,
-                                                    library
-                                                )
+                                                // await getUserTokenBalance(
+                                                    // token,
+                                                    // chainId,
+                                                    // account,
+                                                    // library
+                                                    10000
+                                               // )
                                             );
                                             setToken1BalanceShow(true);
                                         }
@@ -1247,6 +1280,7 @@ const LiquidityComponent = () => {
                     onClick={async () => {
                         if (account == undefined) {
                             //activate(injected);
+
                             // window.conflux.enable();
                             // const accounts = window.conflux.send({ method: 'cfx_accounts' });
                             // const account = accounts[0];

@@ -24,45 +24,30 @@ import { MaxUint256 } from "@ethersproject/constants";
 
 export const INITIAL_ALLOWED_SLIPPAGE = 50; //bips
 
-export const ROUTER_ADDRESS = "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D";
+export const ROUTER_ADDRESS = "cfxtest:achewsya8dah9guctnjuexdgjfb4cusrmjk7ynkzvt";
 // export const ROUTER_ADDRESS = "0xF3726d6acfeda3E73a6F2328b948834f3Af39A2B";
 
 export const  supportedTokens= [
+ 
   {
-    symbol: "USDC",
-    address: "0x4DBCdF9B62e891a7cec5A2568C3F4FAF9E8Abe2b",
-    decimal: 6,
-  },
-  {
-    symbol: "ETH",
-    address: "0xc778417E063141139Fce010982780140Aa0cD5Ab",
+    symbol: "GG1",
+    address: "cfxtest:acajea4m28rw90gge2efyf8mvk7z05w1hybdk23dhj",
     decimal: 18,
   },
   {
-    symbol: "WETH",
-    address: "0xc778417E063141139Fce010982780140Aa0cD5Ab",
+    symbol: "JJ1",
+    address: "cfxtest:acf4kfxvb263vvthkrjt5ar5djpf7w531ey0knkk8u",
     decimal: 18,
   },
-  {
-    symbol: "UNI",
-    address: "0x03e6c12ef405ac3f642b9184eded8e1322de1a9e",
-    decimal: 18,
-  },
-  {
-    symbol: "DAI",
-    address: "0x5592ec0cfb4dbc12d3ab100b257153436a1f0fea",
-    decimal: 18,
-  },
-  {
-    symbol: "cDAI",
-    address: "0x6d7f0754ffeb405d23c51ce938289d4835be3b14",
-    decimal: 8,
-  },
-  {
-    symbol: "WBTC",
-    address: "0x577d296678535e4903d59a4c929b718e1d575e0a",
-    decimal: 8,
-  },
+ { symbol: "THU00",
+  address: "cfxtest:accy2y4xv3g9du0j6kt9uuk353g6vrz03ubtssgsju",
+  decimal: 18,
+},
+{
+  symbol: "THU01",
+  address: "cfxtest:acd2f05trwk0wnvazm40jc3tucn362w3bemw8gd0dy",
+  decimal: 18,
+},
 ];
 
 
