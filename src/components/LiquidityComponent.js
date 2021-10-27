@@ -82,11 +82,11 @@ export async function getEstimated(
 
         console.log(FACTORY_ADDRESS);
 
-        //let router = getRouterContract(library, account);
-        let router = conflux.Contract({
-            abi:IUniswapV2Router02ABI,
-            address:FACTORY_ADDRESS
-        })
+        let router = getRouterContract(library, account);
+        // let router = conflux.Contract({
+        //     abi:IUniswapV2Router02ABI,
+        //     address:FACTORY_ADDRESS
+        // })
         console.log("connect to conflux router contract")
 
         let slippage = allowedSlippage * 0.01;
@@ -439,7 +439,7 @@ export async function getEstimated(
                 let token0approval = await checkTokenIsApproved(
                     inToken0Address,
                     parsedToken0Amount.raw.toString(),
-                    library,
+                    conflux,
                     account
                 );
                 console.log("token 0 approved?");
@@ -547,8 +547,8 @@ export async function getEstimated(
                 );
                 console.log(value);
             } else {
-                estimate = router.estimateGas.addLiquidity;
-                method = router.addLiquidity;
+                // estimate = router.estimateGas.addLiquidity;
+                // method = router.addLiquidity;
                 args = [
                     inToken0Address,
                     inToken1Address,
@@ -569,10 +569,10 @@ export async function getEstimated(
             }
             console.log("args");
             console.log(args);
-            console.log("estimate");
-            console.log(estimate);
-            console.log("method");
-            console.log(method);
+            // console.log("estimate");
+            // console.log(estimate);
+            // console.log("method");
+            // console.log(method);
             console.log("value");
             console.log(value);
 
@@ -652,10 +652,10 @@ export async function addLiquidity(
             // use WETH for ETHER to work with Uniswap V2 SDK
             const token0 = token0IsETH
                 ? WETH[chainId]
-                : new Token(chainId, inToken0Address, inToken0Decimal, inToken0Symbol);
+                : new TokenConflux(chainId, inToken0Address, inToken0Decimal, inToken0Symbol);
             const token1 = token1IsETH
                 ? WETH[chainId]
-                : new Token(chainId, inToken1Address, inToken1Decimal, inToken1Symbol);
+                : new TokenConflux(chainId, inToken1Address, inToken1Decimal, inToken1Symbol);
 
             // quit if the two tokens are equivalent, i.e. have the same chainId and address
             if (token0.equals(token1)) return new ACYSwapErrorStatus("Equal tokens!");
@@ -676,17 +676,12 @@ export async function addLiquidity(
             console.log("------------------ PREPARE ADD LIQUIDITY ------------------");
             let estimate;
             let method;
-            if (token0IsETH || token1IsETH) {
-                estimate = router.estimateGas.addLiquidityETH;
-                method = router.addLiquidityETH;
+         
+                // estimate = router.estimateGas.addLiquidity;
+                // method = router.addLiquidity;
                 console.log(args);
                 console.log(value);
-            } else {
-                estimate = router.estimateGas.addLiquidity;
-                method = router.addLiquidity;
-                console.log(args);
-                console.log(value);
-            }
+                console.log("ready");
 
             setLiquidityStatus("Processing add liquidity request");
             console.log("parsed token 0 amount");
@@ -696,20 +691,21 @@ export async function addLiquidity(
             console.log("slippage");
             console.log(allowedSlippage);
 
-            console.log(estimate);
-            console.log(method);
+            // console.log(estimate);
+            // console.log(method);
             console.log(args);
             console.log(value);
 
-            let result = await estimate(...args, value ? {value} : {}).then(
-                (estimatedGasLimit) =>
-                    method(...args, {
-                        ...(value ? {value} : {}),
-                        gasLimit: calculateGasMargin(estimatedGasLimit),
+            let estimatedGasLimit = await router.addLiquidity(...args).estimateGasAndCollateral({from:account});
+            console.log(estimatedGasLimit);
+            let gasLimit = estimatedGasLimit[0];//1 gasuSED 2 STORAGE
+
+            let result = router.addLiquidity(...args).sendTransaction({from:account , gasLimit:gasLimit
                     }).catch((e) => {
                         return new ACYSwapErrorStatus("Error in transaction");
-                    })
-            );
+                    });
+            console.log(result);
+
             return result;
         }
     })();
@@ -718,8 +714,8 @@ export async function addLiquidity(
     } else {
         console.log("status");
         console.log(status);
-        let url = "https://rinkeby.etherscan.io/tx/" + status.hash;
-        setLiquidityStatus(<a href={url} target={"_blank"}>view it on etherscan</a>);
+        let url = "https://testnet.confluxscan.io/" + status.hash;
+        setLiquidityStatus(<a href={url} target={"_blank"}>view it on confluxscan</a>);
     }
     return;
 }
@@ -907,7 +903,7 @@ const LiquidityComponent = () => {
         console.log(accounts);
         setAccount(accounts[0]);
         setChainId(1);
-        setLibrary(window.conflux);
+        setLibrary(conflux);
         setConflux(conflux);
         console.log(accounts[0]);
     }, []);
@@ -1048,13 +1044,12 @@ const LiquidityComponent = () => {
                                         } else {
                                             setToken0(token);
                                             setToken0Balance(
-                                                // await getUserTokenBalance(
-                                                //     token,
-                                                //     chainId,
-                                                //     account,
-                                                //     library
-                                                // )
-                                                1000
+                                                await getUserTokenBalance(
+                                                    token,
+                                                    chainId,
+                                                    account,
+                                                    library
+                                                )
                                             );
                                             setToken0BalanceShow(true);
                                         }
@@ -1097,13 +1092,13 @@ const LiquidityComponent = () => {
                                         } else {
                                             setToken1(token);
                                             setToken1Balance(
-                                                // await getUserTokenBalance(
-                                                    // token,
-                                                    // chainId,
-                                                    // account,
-                                                    // library
-                                                    10000
-                                               // )
+                                                await getUserTokenBalance(
+                                                    token,
+                                                    chainId,
+                                                    account,
+                                                    library
+                                                
+                                               )
                                             );
                                             setToken1BalanceShow(true);
                                         }
@@ -1304,7 +1299,7 @@ const LiquidityComponent = () => {
                                 100 * slippageTolerance,
                                 exactIn,
                                 chainId,
-                                library,
+                                conflux,
                                 account,
                                 pair,
                                 noLiquidity,
