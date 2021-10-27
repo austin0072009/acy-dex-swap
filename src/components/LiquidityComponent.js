@@ -238,6 +238,7 @@ export async function getEstimated(
                         token1 === ETHER
                             ? CurrencyAmount.ether(dependentTokenAmount.raw)
                             : dependentTokenAmount;
+                    console.log('dependentTokenAmount:',dependentTokenAmount);
                     setToken1Amount(dependentTokenAmount.toExact());
                     inToken1Amount = dependentTokenAmount.toExact();
                 } else {

@@ -754,17 +754,38 @@ const SwapComponent = () => {
     const dependentFieldPlaceholder = "Estimated value";
     const slippageTolerancePlaceholder = "please input a number from 1.00 to 100.00";
 
-    const {account, chainId, library, activate} = useWeb3React();
+    // const {account, chainId, library, activate} = useWeb3React();
 
 
-    const injected = new InjectedConnector({
-        supportedChainIds: [1, 3, 4, 5, 42, 80001],
-    });
+    // const injected = new InjectedConnector({
+    //     supportedChainIds: [1, 3, 4, 5, 42, 80001],
+    // });
+    const [account ,setAccount] = useState();
+    const [library,setLibrary] = useState();
+    const [chainId,setChainId] = useState();
+    const [conflux,setConflux] = useState();
     
-    // This is to connect wallet.
-    useEffect(() => {
-        // activate(injected);
+    useEffect(async () => {
+        const conflux = new Conflux();
+        const confluxPortal = window.conflux;
+      
+        conflux.provider = confluxPortal;
+      
+        confluxPortal.enable();
+      
+        const accounts = await confluxPortal.send('cfx_requestAccounts');
+        console.log('accounts');
+        console.log(accounts);
+        setAccount(accounts[0]);
+        setChainId(1);
+        setLibrary(window.conflux);
+        setConflux(conflux);
+        console.log(accounts[0]);
     }, []);
+    // This is to connect wallet.
+    // useEffect(() => {
+    //     // activate(injected);
+    // }, []);
 
     // token1Amount is changed according to token0Amount
     let t0Changed = useCallback(async () => {
@@ -1009,7 +1030,7 @@ const SwapComponent = () => {
 
                     onClick={() => {
                         if (account == undefined) {
-                            activate(injected);
+                            // activate(injected);
                         } else {
 
 
