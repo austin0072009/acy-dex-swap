@@ -21,10 +21,12 @@ import {
   InsufficientReservesError,
 } from "@uniswap/sdk";
 import { MaxUint256 } from "@ethersproject/constants";
+import { TokenConflux } from "../components/TokenConflux.class";
+const { Conflux } = require('js-conflux-sdk');
 
 export const INITIAL_ALLOWED_SLIPPAGE = 50; //bips
 
-export const ROUTER_ADDRESS = "cfxtest:achewsya8dah9guctnjuexdgjfb4cusrmjk7ynkzvt";
+export const ROUTER_ADDRESS = "cfxtest:acez2pf23veg3h978v6czc2gcrhdapwzdau7gjcrgu";
 // export const ROUTER_ADDRESS = "0xF3726d6acfeda3E73a6F2328b948834f3Af39A2B";
 
 export const  supportedTokens= [
@@ -70,13 +72,25 @@ export function getProviderOrSigner(library, account) {
 }
 
 // account is optional
-export function getContract(address, ABI, library, account) {
-  if (!isAddress(address) || address === AddressZero) {
-    throw Error(`Invalid 'address' parameter '${address}'.`);
-  }
+// export function getContract(address, ABI, library, account) {
+//   if (!isAddress(address) || address === AddressZero) {
+//     throw Error(`Invalid 'address' parameter '${address}'.`);
+//   }
 
-  return new Contract(address, ABI, getProviderOrSigner(library, account));
+//   return new Contract(address, ABI, getProviderOrSigner(library, account));
+// }
+
+//conflux 
+export function getContract(address, ABI, library, account) {
+
+
+
+  return   library.Contract({
+    abi: ABI,
+    address: address,
+  });
 }
+
 
 export function getRouterContract(library, account) {
   return getContract(ROUTER_ADDRESS, IUniswapV2Router02ABI, library, account);
@@ -92,8 +106,8 @@ export function calculateGasMargin(value) {
 
   console.log("just calculateGasMargin");
   return value
-      .mul(BigNumber.from(10000).add(BigNumber.from(1000)))
-      .div(BigNumber.from(10000));
+      *(BigNumber.from(10000)+(BigNumber.from(1000)))
+      /(BigNumber.from(10000));
 }
 
 // check if hex string is zero
@@ -111,8 +125,8 @@ export async function getAllowance(
 ) {
   let tokenContract = getContract(tokenAddress, ERC20ABI, library, account);
   let allowance = await tokenContract.allowance(owner, spender);
-  console.log(allowance);
-  return allowance;
+  console.log("allowance is" +  allowance[0]);
+  return allowance[0];
 }
 
 // a custom error class for custom error text and handling
@@ -195,19 +209,19 @@ export async function getUserTokenBalanceRaw(token, account, library) {
 
 // get user token balance in readable string foramt
 export async function getUserTokenBalance(token, chainId, account, library) {
-  let { address, symbol, decimal } = token;
+  let { address, symbol, decimals } = token;
 
   if (!token) return;
-  let tokenIsETH = symbol === "ETH";
+  let tokenContract = library.Contract({
+    abi: ERC20ABI,
+    address: address,
+  });
 
-  return formatUnits(
-      await getUserTokenBalanceRaw(
-          tokenIsETH ? ETHER : new Token(chainId, address, decimal, symbol),
-          account,
-          library
-      ),
-      decimal
-  );
+  // return formatUnits(
+  //   await tokenContract.balanceOf(account),
+  //     decimals
+  // );
+  return await tokenContract.balanceOf(account);
 }
 
 // return slippage adjusted amount for arguments when adding liquidity. Returns JSBI
@@ -247,31 +261,28 @@ export async function approve(tokenAddress, requiredAmount, library, account) {
 
   console.log("REquired amount");
   console.log(requiredAmount);
-  if (allowance.lt(BigNumber.from(requiredAmount))) {
+  if (allowance <= (BigNumber.from(requiredAmount))) {
     let tokenContract = getContract(tokenAddress, ERC20ABI, library, account);
     let useExact = false;
     console.log("NOT ENOUGH ALLOWANCE");
     // try to get max allowance
-    let estimatedGas = await tokenContract.estimateGas["approve"](
+    let estimatedGas = await tokenContract.approve(
         ROUTER_ADDRESS,
         MaxUint256
-    ).catch(async() => {
+    ).estimateGasAndCollateral({from:account }).catch(async() => {
       // general fallback for tokens who restrict approval amounts
       useExact = true;
-      let result= await tokenContract.estimateGas.approve(
+      let result= await tokenContract.approve(
           ROUTER_ADDRESS,
           requiredAmount.raw.toString()
-      );
+      ).estimateGasAndCollateral({from: account});
       return result;
     });
 
     console.log(`Exact? ${useExact}`);
     let res=await tokenContract.approve(
         ROUTER_ADDRESS,
-        useExact ? requiredAmount.raw.toString() : MaxUint256,
-        {
-          gasLimit: calculateGasMargin(estimatedGas),
-        }
+        requiredAmount
     ).catch(()=>{
       console.log("not approve success");
         return false;
@@ -294,7 +305,7 @@ export async function approve(tokenAddress, requiredAmount, library, account) {
         account // active account
      );
       
-      if(newAllowance.gte(BigNumber.from(requiredAmount))){
+      if(newAllowance >= (BigNumber.from(requiredAmount))){
         flag=true;
         break;
         
@@ -309,26 +320,32 @@ export async function approve(tokenAddress, requiredAmount, library, account) {
 }
 
 // should be used in polling to check status of token approval every n seconds
-export async function checkTokenIsApproved(
-    tokenAddress,
-    requiredAmount,
-    library,
-    account
-) {
+export async function checkTokenIsApproved(tokenAddress,requiredAmount,library,account) {
+  // const conflux = new Conflux();
+  // const confluxPortal = window.conflux;
 
-  let allowance = await getAllowance(
-      tokenAddress,
-      account, // owner
-      ROUTER_ADDRESS, //spender
-      library, // provider
-      account // active account
-  );
+  // conflux.provider = confluxPortal;
 
-  console.log("REQUIRED AMOUNT:");
-  console.log(requiredAmount);
-  console.log(`ALLOWANCE FOR TOKEN ${tokenAddress}:`);
-  console.log(allowance);
-  return allowance.gte(BigNumber.from(requiredAmount));
+  // confluxPortal.enable();
+
+  // const accounts = await confluxPortal.send('cfx_requestAccounts');
+  // console.log('accounts');
+  // console.log(accounts);
+
+  // const account = accounts[0];
+  // console.log(account);
+
+  const tokenContract = library.Contract({
+    abi: ERC20ABI,
+    address: tokenAddress,
+  });
+
+
+  const result = await tokenContract.allowance(account,ROUTER_ADDRESS);
+  console.log("allowane amount is  ")
+  console.log(result);
+  if(result[0] >= requiredAmount)return true;
+  else return false;
 }
 
 
