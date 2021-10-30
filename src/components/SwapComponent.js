@@ -1143,16 +1143,13 @@ const SwapComponent = () => {
                 </Button>
                 <Button
                     variant="success"
-                    disabled={!swapButtonState}
-
+                    // disabled={!swapButtonState}
                     onClick={() => {
                         if (typeof window.conflux == "undefined") {
                             window.conflux.enable();
                             console.log("undefined");
                         } else {
                             //window.conflux.enable();
-
-
                             swap(
                                 {
                                     ...token0,
