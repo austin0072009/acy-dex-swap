@@ -1,5 +1,6 @@
 import { abi as IUniswapV2Router02ABI } from "../abis/IUniswapV2Router02.json";
 import { abi as IUniswapV2PairABI } from "@uniswap/v2-core/build/IUniswapV2Pair.json";
+import { abi as FACTORY_ABI } from "@uniswap/v2-core/build/IUniswapV2Factory.json";
 import ERC20ABI from "../abis/ERC20.json";
 import { getAddress } from "@ethersproject/address";
 import { Contract } from "@ethersproject/contracts";
@@ -19,15 +20,17 @@ import {
   ETHER,
   CurrencyAmount,
   InsufficientReservesError,
-} from "@uniswap/sdk";
+} from "@acyswap/sdk";
 import { MaxUint256 } from "@ethersproject/constants";
 import { TokenConflux } from "../components/TokenConflux.class";
 const { Conflux } = require('js-conflux-sdk');
 
 export const INITIAL_ALLOWED_SLIPPAGE = 50; //bips
 
-export const ROUTER_ADDRESS = "cfxtest:acez2pf23veg3h978v6czc2gcrhdapwzdau7gjcrgu";
+export const ROUTER_ADDRESS  = "cfxtest:acez2pf23veg3h978v6czc2gcrhdapwzdau7gjcrgu";
+export const FACTORY_ADDRESS = "cfxtest:achewsya8dah9guctnjuexdgjfb4cusrmjk7ynkzvt";
 // export const ROUTER_ADDRESS = "0xF3726d6acfeda3E73a6F2328b948834f3Af39A2B";
+//0x8e493a80f0c07f9a027ad1024c664143a141cd52 
 
 export const  supportedTokens= [
  
@@ -83,12 +86,14 @@ export function getProviderOrSigner(library, account) {
 //conflux 
 export function getContract(address, ABI, library, account) {
 
-
-
   return   library.Contract({
     abi: ABI,
     address: address,
   });
+}
+
+export function getFactoryContract(library, account) {
+  return getContract(FACTORY_ADDRESS, FACTORY_ABI, library, account);
 }
 
 

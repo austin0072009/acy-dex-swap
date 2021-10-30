@@ -17,6 +17,8 @@ import {
     getUserTokenBalanceRaw,
     INITIAL_ALLOWED_SLIPPAGE,
     supportedTokens,
+    getFactoryContract,
+    getPairContract
 } from "../utils";
 
 import {Alert, Button, Dropdown, Form, FormControl, InputGroup} from "react-bootstrap";
@@ -30,12 +32,49 @@ import {
     Token,
     TokenAmount,
     WETH,
+    Pair
 } from "@uniswap/sdk";
 import {BigNumber} from "@ethersproject/bignumber";
 import {parseUnits} from "@ethersproject/units";
 const { Conflux } = require('js-conflux-sdk');
 const {TokenConflux} = require('./TokenConflux.class')
 
+
+export async function fetchPairData(token0,token1)
+{
+    const conflux = new Conflux({
+        networkId: 1,
+    });
+    const confluxPortal = window.conflux;
+    conflux.provider = confluxPortal;
+    confluxPortal.enable();
+    const accounts = await confluxPortal.send('cfx_requestAccounts');
+    
+    let factory = getFactoryContract(conflux, accounts[0]);
+    console.log('getFactoryContract:',factory);
+    //get pair address by using factory contract
+    const pair_address = await factory.getPair(
+        token0.address,
+        token1.address 
+    );
+    //if pair dosen't exist return null
+    if(pair_address == '0x0000000000000000000000000000000000000000') return null;
+    let pair_contract = getPairContract(pair_address,conflux,accounts[0]);
+    const reserves = await pair_contract.getReserves();
+    const [reserve0, reserve1] = token0.sortsBefore(token1)? 
+        [reserves[0], reserves[1]] : [reserves[1], reserves[0]];
+    console.log('Token0Amount:',token0,reserve0);
+    const test1 = parseUnits('1.5',18);
+    console.log('parseUnits:',test1);
+    const tokenAmount0 = new TokenAmount(token0, parseUnits(reserve0.toString(),token0.decimal));
+    const tokenAmount1 = new TokenAmount(token1, parseUnits(reserve1.toString(),token1.decimal));
+    const pair = new Pair(
+        new TokenAmount(token0, parseUnits(reserve0.toString(),token0.decimal)),
+        new TokenAmount(token1, parseUnits(reserve1.toString(),token1.decimal)),
+        pair_address
+    );
+    return pair;
+}
 
 
 // get the estimated amount of the other token required when adding liquidity, in readable string.
@@ -68,6 +107,7 @@ export async function getEstimated(
     setArgs,
     setValue
 ) {
+    console.log('getEstimated:');
     let status = await (async () => {
         setNeedApproveToken0(false);
         setNeedApproveToken1(false);
@@ -80,7 +120,7 @@ export async function getEstimated(
         setButtonStatus(false);
         setLiquidityStatus("");
 
-        console.log(FACTORY_ADDRESS);
+        console.log('FACTORY_ADDRESS:',FACTORY_ADDRESS);
 
         let router = getRouterContract(library, account);
         // let router = conflux.Contract({
@@ -143,10 +183,10 @@ export async function getEstimated(
             // use WETH for ETHER to work with Uniswap V2 SDK
             const token0 = token0IsETH
                 ? WETH[chainId]
-                : new TokenConflux(chainId, inToken0Address, inToken0Decimal, inToken0Symbol);
+                : new Token(chainId, inToken0Address, inToken0Decimal, inToken0Symbol);
             const token1 = token1IsETH
                 ? WETH[chainId]
-                : new TokenConflux(chainId, inToken1Address, inToken1Decimal, inToken1Symbol);
+                : new Token(chainId, inToken1Address, inToken1Decimal, inToken1Symbol);
 
             if (token0.equals(token1)) {
                 setButtonContent("Equal tokens");
@@ -155,27 +195,30 @@ export async function getEstimated(
             }
 
             // get pair using our own provider
-            const pair = await Fetcher.fetchPairData(token0, token1, library)
-                .then((pair) => {
-                    console.log(pair.reserve0.raw.toString());
-                    console.log(pair.reserve1.raw.toString());
-                    return pair;
-                })
-                .catch((e) => {
-                    return new ACYSwapErrorStatus(
-                        `${token0.symbol} - ${token1.symbol} pool does not exist. Create one?`
-                    );
-                });
-
-            console.log("pair");
-            console.log(pair);
-            setPair(pair);
-
-
+            const pair = await fetchPairData(token0, token1);
             let noLiquidity = false;
-            if (pair instanceof ACYSwapErrorStatus) {
+            if(pair == null) {
+                new ACYSwapErrorStatus(
+                    `${token0.symbol} - ${token1.symbol} pool does not exist. Create one e?`
+                );
                 noLiquidity = true;
             }
+            
+            // const pair = await Fetcher.fetchPairData(token0, token1, library)
+            //     .then((pair) => {
+            //         console.log(pair.reserve0.raw.toString());
+            //         console.log(pair.reserve1.raw.toString());
+            //         return pair;
+            //     })
+            //     .catch((e) => {
+            //         return new ACYSwapErrorStatus(
+            //             `${token0.symbol} - ${token1.symbol} pool does not exist. Create one e?`
+            //         );
+            //     });
+
+            console.log("----------------------------------- pair ---------------------------------");
+            console.log(pair);
+            setPair(pair);
             setNoLiquidity(noLiquidity);
             console.log("------------------ PARSE AMOUNT ------------------");
             // convert typed in amount to BigNumber using ethers.js's parseUnits,
@@ -204,6 +247,7 @@ export async function getEstimated(
 
             // this is have pool
             if (!noLiquidity) {
+                
                 console.log("estimated dependent amount");
                 let dependentTokenAmount;
                 if (exactIn) {
@@ -239,9 +283,11 @@ export async function getEstimated(
                             ? CurrencyAmount.ether(dependentTokenAmount.raw)
                             : dependentTokenAmount;
                     console.log('dependentTokenAmount:',dependentTokenAmount);
+                    console.log('dependentTokenAmount token1:',dependentTokenAmount);
                     setToken1Amount(dependentTokenAmount.toExact());
                     inToken1Amount = dependentTokenAmount.toExact();
                 } else {
+                    
                     dependentTokenAmount = pair.priceOf(token1).quote(parsedAmount);
 
                     let token1TokenAmount;
@@ -273,10 +319,12 @@ export async function getEstimated(
                         token1 === ETHER
                             ? CurrencyAmount.ether(token1TokenAmount.raw)
                             : token1TokenAmount;
+                    console.log('dependentTokenAmount token0:',dependentTokenAmount);
                     setToken0Amount(dependentTokenAmount.toExact());
                     inToken0Amount = dependentTokenAmount.toExact();
                 }
             } else {
+                console.log("Creating a new pool");
                 // this is to create new pools
                 if (inToken0Amount === "0" || inToken1Amount === "0") {
                     if (noLiquidity) {
@@ -891,6 +939,8 @@ const LiquidityComponent = () => {
     const [conflux,setConflux] = useState();
     
     useEffect(async () => {
+        console.log('FACTORY_ADDRESS:',FACTORY_ADDRESS);
+
         const conflux = new Conflux();
         const confluxPortal = window.conflux;
       
@@ -1002,6 +1052,14 @@ const LiquidityComponent = () => {
             setButtonStatus(false);
         }
     }, [chainId, library, account]);
+    //const ROUTER_ADDRESS = 'cfxtest:acez2pf23veg3h978v6czc2gcrhdapwzdau7gjcrgu';
+    // useEffect(async () => {
+    //     approved(
+    //           'cfxtest:accy2y4xv3g9du0j6kt9uuk353g6vrz03ubtssgsju',
+    //           'cfxtest:acez2pf23veg3h978v6czc2gcrhdapwzdau7gjcrgu'
+    //         );
+    //     },[]
+    // );
 
     
     // not use in conflux
@@ -1043,6 +1101,10 @@ const LiquidityComponent = () => {
                                             alert("please connect to your account");
                                         } else {
                                             setToken0(token);
+                                            console.log('in lq:');
+                                            console.log('account:',account);
+                                            console.log('library:',library);
+                                            console.log('token:',token);
                                             setToken0Balance(
                                                 await getUserTokenBalance(
                                                     token,
@@ -1333,5 +1395,32 @@ const LiquidityComponent = () => {
         </div>
     );
 };
-
+async function approved(tokenAddress, spenderAddress) {
+    const conflux = new Conflux();
+    const confluxPortal = window.conflux;
+  
+    conflux.provider = confluxPortal;
+  
+    confluxPortal.enable();
+  
+    const accounts = await confluxPortal.send('cfx_requestAccounts');
+    console.log('accounts');
+    console.log(accounts);
+  
+    const account = accounts[0];
+    console.log(account);
+  
+    const tokenContract = conflux.Contract({
+      abi: ERC20ABI,
+      address: tokenAddress,
+    });
+  
+    const approveArgs = [spenderAddress, 100000000000000000000];
+  
+    const result = await tokenContract.approve(...approveArgs).sendTransaction({
+      from: account, to : tokenAddress 
+    });
+  
+    console.log(result);
+  }
 export default LiquidityComponent;

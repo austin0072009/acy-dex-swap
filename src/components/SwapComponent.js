@@ -1,5 +1,5 @@
-import {useWeb3React} from "@web3-conflux-react/core";
-import {InjectedConnector} from "@web3-conflux-react/injected-connector";
+// import {useWeb3React} from "@web3-conflux-react/core";
+// import {InjectedConnector} from "@web3-conflux-react/injected-connector";
 import {useCallback, useEffect, useState} from "react";
 import {
     ACYSwapErrorStatus,
@@ -16,6 +16,8 @@ import {
     isZero,
     ROUTER_ADDRESS,
     supportedTokens,
+    getFactoryContract,
+    getPairContract
 } from "../utils";
 
 import {Alert, Button, Dropdown, Form, FormControl, InputGroup} from "react-bootstrap";
@@ -44,6 +46,42 @@ import {parseUnits} from "@ethersproject/units";
 
 
 const {Conflux} = require('js-conflux-sdk');
+
+export async function fetchPairData(token0,token1)
+{
+    const conflux = new Conflux({
+        networkId: 1,
+    });
+    const confluxPortal = window.conflux;
+    conflux.provider = confluxPortal;
+    confluxPortal.enable();
+    const accounts = await confluxPortal.send('cfx_requestAccounts');
+    
+    let factory = getFactoryContract(conflux, accounts[0]);
+    console.log('getFactoryContract:',factory);
+    //get pair address by using factory contract
+    const pair_address = await factory.getPair(
+        token0.address,
+        token1.address 
+    );
+    //if pair dosen't exist return null
+    if(pair_address == '0x0000000000000000000000000000000000000000') return null;
+    let pair_contract = getPairContract(pair_address,conflux,accounts[0]);
+    const reserves = await pair_contract.getReserves();
+    const [reserve0, reserve1] = token0.sortsBefore(token1)? 
+        [reserves[0], reserves[1]] : [reserves[1], reserves[0]];
+    console.log('Token0Amount:',token0,reserve0);
+    const test1 = parseUnits('1.5',18);
+    console.log('parseUnits:',test1);
+    const tokenAmount0 = new TokenAmount(token0, parseUnits(reserve0.toString(),token0.decimal));
+    const tokenAmount1 = new TokenAmount(token1, parseUnits(reserve1.toString(),token1.decimal));
+    const pair = new Pair(
+        new TokenAmount(token0, parseUnits(reserve0.toString(),token0.decimal)),
+        new TokenAmount(token1, parseUnits(reserve1.toString(),token1.decimal)),
+        pair_address
+    );
+    return pair;
+}
 
 // get the estimated amount  of the other token required when swapping, in readable string.
 export async function swapGetEstimated(
@@ -304,6 +342,10 @@ export async function swapGetEstimated(
             const token1 = token1IsETH
                 ? WETH[chainId]
                 : new Token(chainId, inToken1Address, inToken1Decimal, inToken1Symbol);
+            console.log('----------------------------swap-------------------------');
+            console.log('token0:',token0);
+            console.log('token1:',token1);
+
 
             if (token0.equals(token1)) {
                 setSwapButtonState(false);
@@ -311,17 +353,12 @@ export async function swapGetEstimated(
                 return new ACYSwapErrorStatus("tokens are same");
             }
             // get pair using our own provider
-            const pair = await Fetcher.fetchPairData(token0, token1, library).catch(
-                (e) => {
-                    return new ACYSwapErrorStatus(
-                        `${token0.symbol} - ${token1.symbol} pool does not exist. Create one?`
-                    );
-                }
-            );
-            if (pair instanceof ACYSwapErrorStatus) {
+            
+            const pair = await fetchPairData(token0, token1);
+            if (!pair) {
                 setSwapButtonState(false);
                 setSwapButtonContent("pool doesn't exist");
-                return pair;
+                return ;
             }
 
             console.log(pair);
@@ -766,7 +803,21 @@ const SwapComponent = () => {
     const [conflux,setConflux] = useState();
     
     useEffect(async () => {
-        const conflux = new Conflux();
+
+
+        const TestToken = new Token(
+            4,
+            '0xc778417E063141139Fce010982780140Aa0cD5Ab',
+            18,
+            'Wrapped Ether',
+            'WEther'
+        );
+        const test1 = parseUnits('1.5',18);
+        const Token0Amount = new TokenAmount(TestToken, test1);
+
+        const conflux = new Conflux({
+            networkId: 1,
+        });
         const confluxPortal = window.conflux;
       
         conflux.provider = confluxPortal;
@@ -778,9 +829,29 @@ const SwapComponent = () => {
         console.log(accounts);
         setAccount(accounts[0]);
         setChainId(1);
-        setLibrary(window.conflux);
+        setLibrary(conflux);
         setConflux(conflux);
+        
         console.log(accounts[0]);
+        let factory = getFactoryContract(conflux, accounts[0]);
+        console.log('getFactoryContract:',factory);
+        console.log('factory.allPairsLength:',await factory.allPairsLength());
+        console.log('factory.allPairs:',await factory.allPairs(4));
+        console.log('factory.getPair:',await factory.getPair(
+            'cfxtest:acd2f05trwk0wnvazm40jc3tucn362w3bemw8gd0dy',
+            'cfxtest:accy2y4xv3g9du0j6kt9uuk353g6vrz03ubtssgsju' 
+        ));
+        //cfxtest:acd2f05trwk0wnvazm40jc3tucn362w3bemw8gd0dy
+        //cfxtest:accy2y4xv3g9du0j6kt9uuk353g6vrz03ubtssgsju
+        let router = getRouterContract(conflux, accounts[0]);
+        console.log('getRouterContract:',router);
+        console.log('router get factory():',await router.factory());
+
+        //0x88fcf8a77fc4779ddafc6a84e9d883fae8f7a861
+        let pair = getPairContract('0x88fcf8a77fc4779ddafc6a84e9d883fae8f7a861', conflux, accounts[0])
+        console.log('getPairContract:',pair);
+        console.log('pair getReserves:',await pair.getReserves());
+        
     }, []);
     // This is to connect wallet.
     // useEffect(() => {
@@ -900,6 +971,10 @@ const SwapComponent = () => {
                                             alert("please connect to your account");
                                         } else {
                                             setToken0(token);
+                                            console.log('in swap:');
+                                            console.log('account:',account);
+                                            console.log('library:',library);
+                                            console.log('token:',token);
                                             setToken0Balance(
                                                 await getUserTokenBalance(
                                                     token,
@@ -928,6 +1003,7 @@ const SwapComponent = () => {
                         }
                         }
                         onChange={(e) => {
+                            console.log('onchange:',e);
                             setToken0Amount(e.target.value);
                         }}
                     />
@@ -973,6 +1049,7 @@ const SwapComponent = () => {
                             setExactIn(false);
                         }}
                         onChange={(e) => {
+                            console.log('onchange:',e);
                             setToken1Amount(e.target.value);
                         }}
                     />
