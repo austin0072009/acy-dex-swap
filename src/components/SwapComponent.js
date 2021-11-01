@@ -697,9 +697,10 @@ export async function swap(
             if (token0.equals(token1)) return new ACYSwapErrorStatus("Equal tokens!");
             // helper function from uniswap sdk to get pair address, probably needed if want to replace fetchPairData
             // get pair using our own provider
+            console.log(pair);
             console.log("------------------ CONSTRUCT PAIR ------------------");
             console.log("FETCH");
-            console.log(pair);
+            
             console.log("------------------ CONSTRUCT ROUTE ------------------");
             // This is where we let Uniswap SDK know we are not using WETH but ETHER
             console.log(route);
@@ -727,7 +728,10 @@ export async function swap(
             console.log("------------------ ARGUMENTS ------------------");
             console.log(options);
             console.log(args);
-
+            console.log('contract:',contract);
+            console.log('contract.estimateGas:',contract.estimateGas);
+            console.log('methodName:',methodName);
+            return ;
             let result = await contract.estimateGas[methodName](...args, options)
                 .then((gasEstimate) => {
                     return contract[methodName](...args, {
@@ -744,9 +748,9 @@ export async function swap(
     if (status instanceof ACYSwapErrorStatus) {
         setSwapStatus(status.getErrorText());
     } else {
-        console.log(status);
-        let url = "https://rinkeby.etherscan.io/tx/" + status.hash;
-        setSwapStatus(<div><a href={url} target={"_blank"}>view it on etherscan</a></div>);
+        // console.log(status);
+        // let url = "https://rinkeby.etherscan.io/tx/" + status.hash;
+        // setSwapStatus(<div><a href={url} target={"_blank"}>view it on etherscan</a></div>);
     }
 }
 
@@ -1145,11 +1149,13 @@ const SwapComponent = () => {
                     variant="success"
                     // disabled={!swapButtonState}
                     onClick={() => {
+                        console.log('swap click 0'); 
                         if (typeof window.conflux == "undefined") {
                             window.conflux.enable();
                             console.log("undefined");
                         } else {
                             //window.conflux.enable();
+                            console.log('swap click ');
                             swap(
                                 {
                                     ...token0,
